@@ -20,10 +20,12 @@ class TMF882XVis(Node):
     def sub_callback(self, msg):
 
         hists = np.array(msg.hists).reshape(9, 128)
+        max_val = np.max(hists)
         for row in range(3):
             for col in range(3):
                 self.ax[row][col].cla()
                 self.ax[row][col].plot(hists[row*3+col])
+                self.ax[row][col].set_ylim([0, max_val])
 
         plt.pause(0.05)
 
