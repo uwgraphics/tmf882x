@@ -21,7 +21,8 @@ setup(
     entry_points={
         'console_scripts': [
             'tmf882x_pub = tmf882x.tmf882x_pub:main',
-            'histogram_vis = tmf882x.histogram_vis:main',
+            'tmf882x_vis = tmf882x.tmf882x_vis:main',
+            'plane_vis = tmf882x.plane_vis:main',
         ],
     },
 )
