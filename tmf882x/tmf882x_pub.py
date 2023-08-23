@@ -87,7 +87,21 @@ class TMF882XPub(Node):
                 
                 elif row[0] == '#Prt': # if it is a partial histogram
                     histogram_type = "partial"
-                    pass # TODO: actually process the partial histogram
+                    idx = int(row[self.TMF882X_IDX_FIELD]) # idx is the id of the histogram (e.g. 0-9 for 9 hists + calibration hist)
+                    # when a partial histogram is printed, the value after the idx field is the
+                    # number of bins which were skipped
+                    skipped_bins = int(row[self.TMF882X_IDX_FIELD+1])
+                    if ( idx >= 0 and idx <= 9 ):
+                        for hist_bin in range(skipped_bins, len(row)-self.TMF882X_SKIP_FIELDS):
+                            rawSum[idx][hist_bin] += int(row[self.TMF882X_SKIP_FIELDS+hist_bin])
+                    elif ( idx >= 10 and idx <= 19 ):
+                        for hist_bin in range(skipped_bins, len(row)-self.TMF882X_SKIP_FIELDS):
+                            rawSum[idx - 10][hist_bin] += int(row[self.TMF882X_SKIP_FIELDS+hist_bin]) * 256
+                    elif ( idx >= 20 and idx <= 29 ):
+                        for hist_bin in range(skipped_bins, len(row)-self.TMF882X_SKIP_FIELDS):
+                            rawSum[idx - 20][hist_bin] += int(row[self.TMF882X_SKIP_FIELDS+hist_bin]) * 256 * 256
+                    else:
+                        self.get_logger().error("Line read with invalid idx")
 
             else:
                 self.get_logger().warn("Incomplete line read - measurement skipped")
