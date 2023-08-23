@@ -13,6 +13,14 @@ class TMF882XVis(Node):
 
         self.DIST_TO_BIN_SLOPE = 73.484
         self.DIST_TO_BIN_INTERCEPT = 13.2521
+        # for plotting - the histogram in index 1 is in the top left, 4 is in the top middle, etc.
+        # as if you're reading a book, so the zones look like this:
+        # 2 1 0
+        # 5 4 3
+        # 8 7 6
+        # This arrangement gives you something like a camera would, the view as you're looking
+        # *through* the sensor lines up with what's plotted.
+        self.ZONE_ORDER = [2, 1, 0, 5, 4, 3, 8, 7, 6]
 
         self.subscriber = self.create_subscription(TMF882XMeasure, 'tmf882x', self.sub_callback, 1)
 
@@ -56,30 +64,33 @@ class TMF882XVis(Node):
             dist = (peak_bin-self.DIST_TO_BIN_INTERCEPT)/self.DIST_TO_BIN_SLOPE*1000
             interp_argmax_dists.append(np.clip(dist, 0, None))
         
+        hist_idx = 0
         for row in range(3):
             for col in range(3):
                 self.hist_ax[row][col].cla()
-                self.hist_ax[row][col].plot(hists[row*3+col])
-                self.hist_ax[row][col].set_ylim([0, max_val])
+                self.hist_ax[row][col].plot(hists[self.ZONE_ORDER[hist_idx]])
+                # self.hist_ax[row][col].set_ylim([0, max_val])
                 self.hist_ax[row][col].set_xticks([])
 
                 self.display_distances(
                     self.dist_ax[row][col],
-                    msg.depths_1[row*3+col],
+                    msg.depths_1[self.ZONE_ORDER[hist_idx]],
                     max_dist=1600
                 )
 
                 self.display_distances(
                     self.argmax_ax[row][col],
-                    argmax_dists[row*3+col],
+                    argmax_dists[self.ZONE_ORDER[hist_idx]],
                     max_dist=1600
                 )
 
                 self.display_distances(
                     self.interp_argmax_ax[row][col],
-                    interp_argmax_dists[row*3+col],
+                    interp_argmax_dists[self.ZONE_ORDER[hist_idx]],
                     max_dist=1600
                 )
+
+                hist_idx += 1
 
         plt.pause(0.05)
 

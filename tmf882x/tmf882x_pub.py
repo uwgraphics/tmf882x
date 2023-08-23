@@ -16,17 +16,23 @@ class TMF882XPub(Node):
         self.TMF882X_IDX_FIELD = 2 # second item in each row contains the idx field
 
         ARDUINO_PORT = "/dev/ttyACM0"
+        BAUDRATE = 1000000
 
-        self.arduino = serial.Serial(port=ARDUINO_PORT, baudrate=1000000, timeout=0.1)
+        self.arduino = serial.Serial(port=ARDUINO_PORT, baudrate=BAUDRATE, timeout=0.1)
 
-        self.get_logger().info(f"Arduino port: {self.arduino.name}")
+        self.get_logger().info(f"Arduino port: {self.arduino.name}, baudrate: {self.arduino.baudrate}")
 
         self.publisher = self.create_publisher(TMF882XMeasure, 'tmf882x', 1)
 
-        self.timer = self.create_timer(0.01, self.timer_callback)
+        self.timer = self.create_timer(0.005, self.timer_callback)
+
+        self.received_data = False
 
     def timer_callback(self):
-        hists, dists = self.get_measurement()
+        hists, dists, histogram_type = self.get_measurement()
+        if not self.received_data:
+            self.get_logger().info("Received data from Arduino")
+            self.received_data = True
 
         message = TMF882XMeasure()
         message.num_zones = self.TMF882X_CHANNELS-1 # -1 because ignore reference hist
@@ -40,6 +46,7 @@ class TMF882XPub(Node):
         message.confs_1 = dists[0]["confs_1"]
         message.depths_2 = dists[0]["depths_2"]
         message.confs_2 = dists[0]["confs_2"]
+        message.histogram_type = histogram_type
         if hists[0]: # if hists is not an empty list (histograms are being reported)
             message.hists = np.array(hists[0][1:]).flatten().tolist()
             message.reference_hist = hists[0][0]
@@ -50,14 +57,10 @@ class TMF882XPub(Node):
 
     def process_raw_hists(self, buffer):
         if len(buffer) != 31:
-            self.get_logger().info("WARNING: Buffer wrong size ({}) - skipping and returning None".format(len(buffer)))
-            return None
+            self.get_logger().warn("Buffer wrong size ({}) - measurement skipped".format(len(buffer)))
+            return None, None
 
         rawSum = [[0 for _ in range(self.TMF882X_BINS)] for _ in range(self.TMF882X_CHANNELS)]
-
-        # for x in buffer:
-        #     print(x)
-        # print("\n")
 
         for i, line in enumerate(buffer):
             data = line.decode('utf-8')
@@ -65,8 +68,10 @@ class TMF882XPub(Node):
             data = data.replace('\n','')
             row = data.split(',')
 
-            if len(row) > 0 and len(row[0]) > 0 and row[0][0] == "#":
-                if row[0] == '#Raw' and len(row) == self.TMF882X_BINS+self.TMF882X_SKIP_FIELDS: # ignore lines that start with #obj
+            if len(row) > 0 and len(row[0]) > 0 and row[0][0] == "#": # if it's a well formed line
+
+                if row[0] == '#Raw' and len(row) == self.TMF882X_BINS+self.TMF882X_SKIP_FIELDS: # if it is a full "raw" histogram
+                    histogram_type = "full"
                     idx = int(row[self.TMF882X_IDX_FIELD]) # idx is the id of the histogram (e.g. 0-9 for 9 hists + calibration hist)
                     if ( idx >= 0 and idx <= 9 ):
                         for hist_bin in range(self.TMF882X_BINS):
@@ -78,12 +83,16 @@ class TMF882XPub(Node):
                         for hist_bin in range(self.TMF882X_BINS):
                             rawSum[idx - 20][hist_bin] += int(row[self.TMF882X_SKIP_FIELDS+hist_bin]) * 256 * 256         # MSB
                     else:
-                        print("SOMETHING IS WRONG")
+                        self.get_logger().error("Line read with invalid idx")
+                
+                elif row[0] == '#Prt': # if it is a partial histogram
+                    histogram_type = "partial"
+                    pass # TODO: actually process the partial histogram
 
             else:
-                self.get_logger().info("Incomplete line read - ignoring")
+                self.get_logger().warn("Incomplete line read - measurement skipped")
 
-        return rawSum
+        return rawSum, histogram_type
 
     def process_raw_dist(self, buffer):
 
@@ -92,6 +101,21 @@ class TMF882XPub(Node):
             data = data.replace('\r','')
             data = data.replace('\n','')
             d = data.split(',')
+
+            # if there is an #Obj tag but no info in it, then the #Obj tag is just being used
+            # as a separator between histograms, so return an empty distance result
+            if d[0] == "#Obj" and len(d) == 1:
+                return {
+                    "I2C_address": 0,
+                    "measurement_num": 0,
+                    "temperature": 0,
+                    "num_valid_results": 0,
+                    "tick": 0,
+                    "depths_1": [0 for _ in range(9)],
+                    "confs_1": [0 for _ in range(9)],
+                    "depths_2": [0 for _ in range(9)],
+                    "confs_2": [0 for _ in range(9)]
+                }
 
             if d[0] == "#Obj" and len(d) == 78:
                 result = {}
@@ -139,26 +163,26 @@ class TMF882XPub(Node):
                 buffer.append(line)
             try:
                 decoded_line = line.decode('utf-8').rstrip().split(',')
-                # if len(decoded_line) > TMF882X_IDX_FIELD and decoded_line[TMF882X_IDX_FIELD] == "29":
                 if decoded_line[0] == "#Obj":
                     if len(buffer) > 1: # if histograms were reported between #Obj (depth) measurements
-                        processed_hists = self.process_raw_hists(buffer)
+                        processed_hists, histogram_type = self.process_raw_hists(buffer)
                     else:
                         processed_hists = []
+                        histogram_type = "None"
                     processed_dists = self.process_raw_dist(buffer)
                     if processed_hists is not None and processed_dists is not None:
                         if frames_finished > -1:
                             all_processed_hists.append(processed_hists)
                             all_processed_dists.append(processed_dists)
                         frames_finished += 1
-                        # print("Frames finished: {}".format(frames_finished))
                     buffer = []
 
             except UnicodeDecodeError:
+                self.get_logger().warn("UnicodeDecodeError - measurement skipped")
                 pass # if you start in a weird place you get random data that can't be decoded, so just ignore
                 buffer = []
 
-        return all_processed_hists, all_processed_dists
+        return all_processed_hists, all_processed_dists, histogram_type
         
 
 def main(args=None):
