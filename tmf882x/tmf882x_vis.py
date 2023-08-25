@@ -20,7 +20,7 @@ class TMF882XVis(Node):
         # 8 7 6
         # This arrangement gives you something like a camera would, the view as you're looking
         # *through* the sensor lines up with what's plotted.
-        self.ZONE_ORDER = [2, 1, 0, 5, 4, 3, 8, 7, 6]
+        self.ZONE_ORDER = [2, 1, 0, 5, 4, 3, 8, 7, 6] # bottom row is 8, 7, 6
 
         self.subscriber = self.create_subscription(TMF882XMeasure, 'tmf882x', self.sub_callback, 1)
 
