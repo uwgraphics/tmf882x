@@ -71,6 +71,9 @@ class TMF882XPub(Node):
             if len(row) > 0 and len(row[0]) > 0 and row[0][0] == "#": # if it's a well formed line
 
                 if row[0] == '#Raw' and len(row) == self.TMF882X_BINS+self.TMF882X_SKIP_FIELDS: # if it is a full "raw" histogram
+                    if '' in row:
+                        print("Empty entry recieved over serial - skipping and returning None")
+                        return None
                     histogram_type = "full"
                     idx = int(row[self.TMF882X_IDX_FIELD]) # idx is the id of the histogram (e.g. 0-9 for 9 hists + calibration hist)
                     if ( idx >= 0 and idx <= 9 ):
