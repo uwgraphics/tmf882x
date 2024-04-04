@@ -56,6 +56,7 @@ class TMF882XPub(Node):
         message.depths_2 = dists[0]["depths_2"]
         message.confs_2 = dists[0]["confs_2"]
         message.histogram_type = histogram_type
+        message.port = self.arduino_port
         if hists[0]: # if hists is not an empty list (histograms are being reported)
             message.hists = np.array(hists[0][1:]).flatten().tolist()
             message.reference_hist = hists[0][0]
