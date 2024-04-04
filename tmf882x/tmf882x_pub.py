@@ -10,15 +10,24 @@ class TMF882XPub(Node):
     def __init__(self):
         super().__init__('tmf882x_pub')
 
+        # ROS parameter for the Arduino port, e.g. /dev/ttyACM0. Defaults to /dev/ttyACM0
+        self.declare_parameter('arduino_port', rclpy.Parameter.Type.STRING)
+
+        try: 
+            self.arduino_port = self.get_parameter('arduino_port').value
+            self.get_logger().info(f"Using provided Arduino port {self.arduino_port}")
+        except:
+            self.arduino_port = "/dev/ttyACM0"
+            self.get_logger().info(f"No Arduino port provided, using default {self.arduino_port}")
+
         self.TMF882X_CHANNELS = 10
         self.TMF882X_BINS = 128
         self.TMF882X_SKIP_FIELDS = 3 # skip first 3 items in each row
         self.TMF882X_IDX_FIELD = 2 # second item in each row contains the idx field
 
-        ARDUINO_PORT = "/dev/ttyACM0"
         BAUDRATE = 1000000
 
-        self.arduino = serial.Serial(port=ARDUINO_PORT, baudrate=BAUDRATE, timeout=0.1)
+        self.arduino = serial.Serial(port=self.arduino_port, baudrate=BAUDRATE, timeout=0.1)
 
         self.get_logger().info(f"Arduino port: {self.arduino.name}, baudrate: {self.arduino.baudrate}")
 
@@ -50,6 +59,7 @@ class TMF882XPub(Node):
         message.depths_2 = dists[0]["depths_2"]
         message.confs_2 = dists[0]["confs_2"]
         message.histogram_type = histogram_type
+        message.port = self.arduino_port
         if hists[0]: # if hists is not an empty list (histograms are being reported)
             message.hists = np.array(hists[0][1:]).flatten().tolist()
             message.reference_hist = hists[0][0]
