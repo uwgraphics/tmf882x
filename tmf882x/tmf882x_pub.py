@@ -29,7 +29,10 @@ class TMF882XPub(Node):
         self.received_data = False
 
     def timer_callback(self):
-        hists, dists, histogram_type = self.get_measurement()
+        m = self.get_measurement()
+        if m is None:
+            return
+        hists, dists, histogram_type = m
         if not self.received_data:
             self.get_logger().info("Received data from Arduino")
             self.received_data = True
