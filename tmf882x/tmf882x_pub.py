@@ -149,33 +149,47 @@ class TMF882XPub(Node):
 
             if d[0] == "#Obj" and len(d) == 78:
                 result = {}
-                result["I2C_address"] = int(d[1])
-                result["measurement_num"] = int(d[2])
-                result["temperature"] = int(d[3])
-                result["num_valid_results"] = int(d[4])
-                result["tick"] = int(d[5])
-                result["depths_1"] = [int(x) for x in [
-                    d[6], d[8], d[10],
-                    d[12], d[14], d[16],
-                    d[18], d[20], d[22]
-                ]]
-                result["confs_1"] = [int(x) for x in [
-                    d[7], d[9], d[11],
-                    d[13], d[15], d[17],
-                    d[19], d[21], d[23]
-                ]]
-                #18 that go in between here are unused, at least in 3x3 mode
-                result["depths_2"] = [int(x) for x in [
-                    d[42], d[44], d[46],
-                    d[48], d[50], d[52],
-                    d[54], d[56], d[58]
-                ]]
-                result["confs_2"] = [int(x) for x in [
-                    d[43], d[45], d[47],
-                    d[49], d[51], d[53],
-                    d[55], d[57], d[59]
-                ]]
-                # last 18 are unused, at least in 3x3 mode
+                try:
+                    result["I2C_address"] = int(d[1])
+                    result["measurement_num"] = int(d[2])
+                    result["temperature"] = int(d[3])
+                    result["num_valid_results"] = int(d[4])
+                    result["tick"] = int(d[5])
+                    result["depths_1"] = [int(x) for x in [
+                        d[6], d[8], d[10],
+                        d[12], d[14], d[16],
+                        d[18], d[20], d[22]
+                    ]]
+                    result["confs_1"] = [int(x) for x in [
+                        d[7], d[9], d[11],
+                        d[13], d[15], d[17],
+                        d[19], d[21], d[23]
+                    ]]
+                    #18 that go in between here are unused, at least in 3x3 mode
+                    result["depths_2"] = [int(x) for x in [
+                        d[42], d[44], d[46],
+                        d[48], d[50], d[52],
+                        d[54], d[56], d[58]
+                    ]]
+                    result["confs_2"] = [int(x) for x in [
+                        d[43], d[45], d[47],
+                        d[49], d[51], d[53],
+                        d[55], d[57], d[59]
+                    ]]
+                    # last 18 are unused, at least in 3x3 mode
+                except ValueError:
+                    self.get_logger().warn("Error decoding distance data - returning blank result")
+                    result = {
+                        "I2C_address": 0,
+                        "measurement_num": 0,
+                        "temperature": 0,
+                        "num_valid_results": 0,
+                        "tick": 0,
+                        "depths_1": [0 for _ in range(9)],
+                        "confs_1": [0 for _ in range(9)],
+                        "depths_2": [0 for _ in range(9)],
+                        "confs_2": [0 for _ in range(9)]
+                    }
 
                 return result
         return None
@@ -195,7 +209,13 @@ class TMF882XPub(Node):
                 decoded_line = line.decode('utf-8').rstrip().split(',')
                 if decoded_line[0] == "#Obj":
                     if len(buffer) > 1: # if histograms were reported between #Obj (depth) measurements
-                        processed_hists, histogram_type = self.process_raw_hists(buffer)
+                        try:
+                            processed_hists, histogram_type = self.process_raw_hists(buffer)
+                        except TypeError:
+                            self.get_logger().warn("TypeError - measurement skipped")
+                            processed_hists = None
+                            histogram_type = "None"
+                            buffer = []
                     else:
                         processed_hists = []
                         histogram_type = "None"
