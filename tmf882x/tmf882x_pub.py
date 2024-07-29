@@ -42,6 +42,7 @@ class TMF882XPub(Node):
         if m is None:
             return
         hists, dists, histogram_type = m
+        # self.get_logger().info(str(hists))
         if not self.received_data:
             self.get_logger().info("Received data from Arduino")
             self.received_data = True
@@ -104,18 +105,15 @@ class TMF882XPub(Node):
                 elif row[0] == '#Prt': # if it is a partial histogram
                     histogram_type = "partial"
                     idx = int(row[self.TMF882X_IDX_FIELD]) # idx is the id of the histogram (e.g. 0-9 for 9 hists + calibration hist)
-                    # when a partial histogram is printed, the value after the idx field is the
-                    # number of bins which were skipped
-                    skipped_bins = int(row[self.TMF882X_IDX_FIELD+1])
                     if ( idx >= 0 and idx <= 9 ):
-                        for hist_bin in range(skipped_bins, len(row)-self.TMF882X_SKIP_FIELDS):
-                            rawSum[idx][hist_bin] += int(row[self.TMF882X_SKIP_FIELDS+hist_bin])
+                        for hist_bin in range(len(row)-self.TMF882X_SKIP_FIELDS-1):
+                            rawSum[idx][hist_bin] += int(row[self.TMF882X_SKIP_FIELDS+hist_bin+1])
                     elif ( idx >= 10 and idx <= 19 ):
-                        for hist_bin in range(skipped_bins, len(row)-self.TMF882X_SKIP_FIELDS):
-                            rawSum[idx - 10][hist_bin] += int(row[self.TMF882X_SKIP_FIELDS+hist_bin]) * 256
+                        for hist_bin in range(len(row)-self.TMF882X_SKIP_FIELDS-1):
+                            rawSum[idx - 10][hist_bin] += int(row[self.TMF882X_SKIP_FIELDS+hist_bin+1]) * 256
                     elif ( idx >= 20 and idx <= 29 ):
-                        for hist_bin in range(skipped_bins, len(row)-self.TMF882X_SKIP_FIELDS):
-                            rawSum[idx - 20][hist_bin] += int(row[self.TMF882X_SKIP_FIELDS+hist_bin]) * 256 * 256
+                        for hist_bin in range(len(row)-self.TMF882X_SKIP_FIELDS-1):
+                            rawSum[idx - 20][hist_bin] += int(row[self.TMF882X_SKIP_FIELDS+hist_bin+1]) * 256 * 256
                     else:
                         self.get_logger().error("Line read with invalid idx")
 
@@ -196,7 +194,7 @@ class TMF882XPub(Node):
 
     def get_measurement(self):
         buffer = []
-        frames_finished = 0 # start at -1 to throw out the first frame
+        frames_finished = 0
 
         all_processed_hists = []
         all_processed_dists = []
