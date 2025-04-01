@@ -25,9 +25,9 @@ class TMF882XPub(Node):
         self.TMF882X_SKIP_FIELDS = 3 # skip first 3 items in each row
         self.TMF882X_IDX_FIELD = 2 # second item in each row contains the idx field
 
-        BAUDRATE = 1000000
+        self.baudrate = 1000000
 
-        self.arduino = serial.Serial(port=self.arduino_port, baudrate=BAUDRATE, timeout=0.1)
+        self.arduino = serial.Serial(port=self.arduino_port, baudrate=self.baudrate, timeout=0.1)
 
         self.get_logger().info(f"Arduino port: {self.arduino.name}, baudrate: {self.arduino.baudrate}")
 
@@ -200,7 +200,16 @@ class TMF882XPub(Node):
         all_processed_dists = []
 
         while frames_finished < 1:
-            line = self.arduino.readline().rstrip()
+            try:
+                line = self.arduino.readline().rstrip()
+            except serial.serialutil.SerialException:
+                self.get_logger().warn("Lost connection to Arduino")
+                self.arduino.close()
+                while not self.arduino.is_open:
+                    try:
+                        self.arduino = serial.Serial(port=self.arduino_port, baudrate=self.baudrate, timeout=0.1)
+                    except serial.serialutil.SerialException:
+                        self.get_logger().error("Failed to reconnect to Arduino")
             if line != "":
                 buffer.append(line)
             try:
