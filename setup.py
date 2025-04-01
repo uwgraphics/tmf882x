@@ -17,7 +17,6 @@ setup(
     maintainer_email='cpsiff@gmail.com',
     description='Read from and visualize TMF882X sensors',
     license='MIT',
-    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             'tmf882x_pub = tmf882x.tmf882x_pub:main',
